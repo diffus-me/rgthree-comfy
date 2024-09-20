@@ -1,4 +1,6 @@
 import os
+
+import execution_context
 import folder_paths
 from nodes import CLIPTextEncode
 from .constants import get_category, get_name
@@ -10,11 +12,11 @@ class RgthreePowerPromptSimple(RgthreePowerPrompt):
     CATEGORY = get_category()
 
     @classmethod
-    def INPUT_TYPES(cls):  # pylint: disable = invalid-name, missing-function-docstring
-        SAVED_PROMPTS_FILES=folder_paths.get_filename_list('saved_prompts')
+    def INPUT_TYPES(cls, context: execution_context.ExecutionContext):  # pylint: disable = invalid-name, missing-function-docstring
+        SAVED_PROMPTS_FILES=folder_paths.get_filename_list(context, 'saved_prompts')
         SAVED_PROMPTS_CONTENT=[]
         for filename in SAVED_PROMPTS_FILES:
-            with open(folder_paths.get_full_path('saved_prompts', filename), 'r') as f:
+            with open(folder_paths.get_full_path(context, 'saved_prompts', filename), 'r') as f:
                 SAVED_PROMPTS_CONTENT.append(f.read())
         return {
             'required': {
@@ -22,7 +24,7 @@ class RgthreePowerPromptSimple(RgthreePowerPrompt):
             },
             'optional': {
                 "opt_clip": ("CLIP", ),
-                'insert_embedding': (['CHOOSE',] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list('embeddings')],),
+                'insert_embedding': (['CHOOSE',] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list(context, 'embeddings')],),
                 'insert_saved': (['CHOOSE',] + SAVED_PROMPTS_FILES,),
             },
             'hidden': {

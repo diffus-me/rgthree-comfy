@@ -1,6 +1,8 @@
 """A simpler SDXL Power Prompt that doesn't load Loras, like for negative."""
 import os
 import re
+
+import execution_context
 import folder_paths
 from nodes import MAX_RESOLUTION, LoraLoader
 from comfy_extras.nodes_clip_sdxl import CLIPTextEncodeSDXL
@@ -20,11 +22,11 @@ class RgthreeSDXLPowerPromptSimple(RgthreeSDXLPowerPromptPositive):
   CATEGORY = get_category()
 
   @classmethod
-  def INPUT_TYPES(cls):  # pylint: disable = invalid-name, missing-function-docstring
-    saved_prompts_files = folder_paths.get_filename_list('saved_prompts')
+  def INPUT_TYPES(cls, context: execution_context.ExecutionContext):  # pylint: disable = invalid-name, missing-function-docstring
+    saved_prompts_files = folder_paths.get_filename_list(context, 'saved_prompts')
     saved_promptes_content = []
     for fname in saved_prompts_files:
-      with open(folder_paths.get_full_path('saved_prompts', fname), 'r', encoding="utf-8") as file:
+      with open(folder_paths.get_full_path(context, 'saved_prompts', fname), 'r', encoding="utf-8") as file:
         saved_promptes_content.append(file.read())
 
     return {
@@ -52,7 +54,7 @@ class RgthreeSDXLPowerPromptSimple(RgthreeSDXLPowerPromptPositive):
         }),
         'insert_embedding': ([
           'CHOOSE',
-        ] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list('embeddings')],),
+        ] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list(context, 'embeddings')],),
         'insert_saved': ([
           'CHOOSE',
         ] + saved_prompts_files,),

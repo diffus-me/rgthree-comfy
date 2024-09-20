@@ -19,7 +19,7 @@ class RgthreePowerLoraLoader:
       },
       # Since we will pass any number of loras in from the UI, this needs to always allow an
       "optional": FlexibleOptionalInputType(any_type),
-      "hidden": {},
+      "hidden": {"context": "EXECUTION_CONTEXT"},
     }
 
   RETURN_TYPES = ("MODEL", "CLIP")
@@ -28,6 +28,7 @@ class RgthreePowerLoraLoader:
 
   def load_loras(self, model, clip, **kwargs):
     """Loops over the provided loras in kwargs and applies valid ones."""
+    context = kwargs["context"]
     for key, value in kwargs.items():
       key = key.upper()
       if key.startswith('LORA_') and 'on' in value and 'lora' in value and 'strength' in value:
@@ -37,7 +38,7 @@ class RgthreePowerLoraLoader:
         strength_clip = value['strengthTwo'] if 'strengthTwo' in value and value[
           'strengthTwo'] is not None else strength_model
         if value['on'] and (strength_model != 0 or strength_clip != 0):
-          lora = get_lora_by_filename(value['lora'], log_node=self.NAME)
+          lora = get_lora_by_filename(context, value['lora'], log_node=self.NAME)
           if lora is not None:
             model, clip = LoraLoader().load_lora(model, clip, lora, strength_model, strength_clip)
 

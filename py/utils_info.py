@@ -8,6 +8,7 @@ import copy
 
 from datetime import datetime
 
+import execution_context
 from .utils import get_dict_value, load_json_file, path_exists, save_json_file
 from .utils_userdata import read_userdata_json, save_userdata_json, delete_userdata_file
 
@@ -25,24 +26,25 @@ async def delete_model_info(file: str,
                             del_metadata=True,
                             del_civitai=True):
   """Delete the info json, and the civitai & metadata caches."""
-  file_path = get_folder_path(file, model_type)
-  if file_path is None:
-    return
-  if del_info:
-    try_info_path = f'{file_path}.rgthree-info.json'
-    if os.path.isfile(try_info_path):
-      os.remove(try_info_path)
-  if del_civitai or del_metadata:
-    file_hash = _get_sha256_hash(file_path)
-    if del_civitai:
-      json_file_path = _get_info_cache_file(file_hash, 'civitai')
-      delete_userdata_file(json_file_path)
-    if del_metadata:
-      json_file_path = _get_info_cache_file(file_hash, 'metadata')
-      delete_userdata_file(json_file_path)
+  # file_path = get_folder_path(file, model_type)
+  # if file_path is None:
+  #   return
+  # if del_info:
+  #   try_info_path = f'{file_path}.rgthree-info.json'
+  #   if os.path.isfile(try_info_path):
+  #     os.remove(try_info_path)
+  # if del_civitai or del_metadata:
+  #   file_hash = _get_sha256_hash(file_path)
+  #   if del_civitai:
+  #     json_file_path = _get_info_cache_file(file_hash, 'civitai')
+  #     delete_userdata_file(json_file_path)
+  #   if del_metadata:
+  #     json_file_path = _get_info_cache_file(file_hash, 'metadata')
+  #     delete_userdata_file(json_file_path)
+  return
 
-
-async def get_model_info(file: str,
+async def get_model_info(context: execution_context.ExecutionContext,
+                         file: str,
                          model_type="loras",
                          default=None,
                          maybe_fetch_civitai=False,
@@ -52,7 +54,7 @@ async def get_model_info(file: str,
                          light=False):
   """Compiles a model info given a stored file next to the model, and/or metadata/civitai."""
 
-  file_path = get_folder_path(file, model_type)
+  file_path = get_folder_path(context, file, model_type)
   if file_path is None:
     return default
 
@@ -106,14 +108,16 @@ async def get_model_info(file: str,
                                                            'metadata' not in info_data['raw'])
 
   if should_fetch_metadata:
-    data_meta = _get_model_metadata(file,
+    data_meta = _get_model_metadata(context,
+                                    file,
                                     model_type=model_type,
                                     default={},
                                     refresh=force_fetch_metadata)
     should_save = _merge_metadata(info_data, data_meta) or should_save
 
   if should_fetch_civitai:
-    data_civitai = _get_model_civitai_data(file,
+    data_civitai = _get_model_civitai_data(context,
+                                           file,
                                            model_type=model_type,
                                            default={},
                                            refresh=force_fetch_civitai)
@@ -296,9 +300,9 @@ def _merge_civitai_data(info_data: dict, data_civitai: dict) -> bool:
   return should_save
 
 
-def _get_model_civitai_data(file: str, model_type="loras", default=None, refresh=False):
+def _get_model_civitai_data(context: execution_context.ExecutionContext, file: str, model_type="loras", default=None, refresh=False):
   """Gets the civitai data, either cached from the user directory, or from civitai api."""
-  file_hash = _get_sha256_hash(get_folder_path(file, model_type))
+  file_hash = _get_sha256_hash(get_folder_path(context, file, model_type))
   if file_hash is None:
     return None
 
@@ -325,9 +329,9 @@ def _get_model_civitai_data(file: str, model_type="loras", default=None, refresh
   return response if response is not None else default
 
 
-def _get_model_metadata(file: str, model_type="loras", default=None, refresh=False):
+def _get_model_metadata(context: execution_context.ExecutionContext, file: str, model_type="loras", default=None, refresh=False):
   """Gets the metadata from the file itself."""
-  file_path = get_folder_path(file, model_type)
+  file_path = get_folder_path(context, file, model_type)
   file_hash = _get_sha256_hash(file_path)
   if file_hash is None:
     return default
@@ -381,9 +385,9 @@ def _read_file_metadata_from_header(file_path: str) -> dict:
   return data
 
 
-def get_folder_path(file: str, model_type="loras"):
+def get_folder_path(context: execution_context.ExecutionContext, file: str, model_type="loras"):
   """Gets the file path ensuring it exists."""
-  file_path = folder_paths.get_full_path(model_type, file)
+  file_path = folder_paths.get_full_path(context, model_type, file)
   if file_path and not path_exists(file_path):
     file_path = os.path.abspath(file_path)
   if not path_exists(file_path):
@@ -405,17 +409,18 @@ def _get_sha256_hash(file_path: str):
   return file_hash
 
 
-async def set_model_info_partial(file: str, info_data_partial, model_type="loras"):
+async def set_model_info_partial(context: execution_context.ExecutionContext, file: str, info_data_partial, model_type="loras"):
   """Sets partial data into the existing model info data."""
-  info_data = await get_model_info(file, model_type=model_type, default={})
+  info_data = await get_model_info(context, file, model_type=model_type, default={})
   info_data = {**info_data, **info_data_partial}
   save_model_info(file, info_data, model_type=model_type)
 
 
 def save_model_info(file: str, info_data, model_type="loras"):
   """Saves the model info alongside the model itself."""
-  file_path = get_folder_path(file, model_type)
-  if file_path is None:
-    return
-  try_info_path = f'{file_path}.rgthree-info.json'
-  save_json_file(try_info_path, info_data)
+  # file_path = get_folder_path(file, model_type)
+  # if file_path is None:
+  #   return
+  # try_info_path = f'{file_path}.rgthree-info.json'
+  # save_json_file(try_info_path, info_data)
+  return

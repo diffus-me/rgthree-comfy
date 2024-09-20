@@ -1,5 +1,6 @@
 import os
 
+import execution_context
 from .log import log_node_warn, log_node_info, log_node_success
 
 from .constants import get_category, get_name
@@ -16,11 +17,11 @@ class RgthreePowerPrompt:
   CATEGORY = get_category()
 
   @classmethod
-  def INPUT_TYPES(cls):  # pylint: disable = invalid-name, missing-function-docstring
-    SAVED_PROMPTS_FILES = folder_paths.get_filename_list('saved_prompts')
+  def INPUT_TYPES(cls, context: execution_context.ExecutionContext):  # pylint: disable = invalid-name, missing-function-docstring
+    SAVED_PROMPTS_FILES = folder_paths.get_filename_list(context, 'saved_prompts')
     SAVED_PROMPTS_CONTENT = []
     for filename in SAVED_PROMPTS_FILES:
-      with open(folder_paths.get_full_path('saved_prompts', filename), 'r') as f:
+      with open(folder_paths.get_full_path(context, 'saved_prompts', filename), 'r') as f:
         SAVED_PROMPTS_CONTENT.append(f.read())
     return {
       'required': {
@@ -32,16 +33,17 @@ class RgthreePowerPrompt:
         "opt_model": ("MODEL",),
         "opt_clip": ("CLIP",),
         'insert_lora': (['CHOOSE', 'DISABLE LORAS'] +
-                        [os.path.splitext(x)[0] for x in folder_paths.get_filename_list('loras')],),
+                        [os.path.splitext(x)[0] for x in folder_paths.get_filename_list(context, 'loras')],),
         'insert_embedding': ([
           'CHOOSE',
-        ] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list('embeddings')],),
+        ] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list(context, 'embeddings')],),
         'insert_saved': ([
           'CHOOSE',
         ] + SAVED_PROMPTS_FILES,),
       },
       'hidden': {
         'values_insert_saved': (['CHOOSE'] + SAVED_PROMPTS_CONTENT,),
+        "context": "EXECUTION_CONTEXT"
       }
     }
 
@@ -66,14 +68,15 @@ class RgthreePowerPrompt:
            insert_lora=None,
            insert_embedding=None,
            insert_saved=None,
-           values_insert_saved=None):
+           values_insert_saved=None,
+           context: execution_context.ExecutionContext=None,):
     if insert_lora == 'DISABLE LORAS':
-      prompt, loras, skipped, unfound = get_and_strip_loras(prompt, log_node=NODE_NAME, silent=True)
+      prompt, loras, skipped, unfound = get_and_strip_loras(context, prompt, log_node=NODE_NAME, silent=True)
       log_node_info(
         NODE_NAME,
         f'Disabling all found loras ({len(loras)}) and stripping lora tags for TEXT output.')
     elif opt_model is not None and opt_clip is not None:
-      prompt, loras, skipped, unfound = get_and_strip_loras(prompt, log_node=NODE_NAME)
+      prompt, loras, skipped, unfound = get_and_strip_loras(context, prompt, log_node=NODE_NAME)
       if len(loras) > 0:
         for lora in loras:
           opt_model, opt_clip = LoraLoader().load_lora(opt_model, opt_clip, lora['lora'],
@@ -81,7 +84,7 @@ class RgthreePowerPrompt:
           log_node_success(NODE_NAME, f'Loaded "{lora["lora"]}" from prompt')
         log_node_info(NODE_NAME, f'{len(loras)} Loras processed; stripping tags for TEXT output.')
     elif '<lora:' in prompt:
-      prompt, loras, skipped, unfound = get_and_strip_loras(prompt, log_node=NODE_NAME, silent=True)
+      prompt, loras, skipped, unfound = get_and_strip_loras(context, prompt, log_node=NODE_NAME, silent=True)
       total_loras = len(loras) + len(skipped) + len(unfound)
       if total_loras:
         log_node_warn(

@@ -7,6 +7,7 @@ import asyncio
 
 from datetime import datetime
 
+import execution_context
 from .utils import path_exists
 from .utils_server import get_param, is_param_falsy
 from .utils_info import delete_model_info, get_model_info, set_model_info_partial
@@ -97,7 +98,8 @@ async def api_set_user_config(request):
 @routes.get('/rgthree/api/loras')
 async def api_get_loras(request):
   """ Returns a list of loras user configuration. """
-  data = folder_paths.get_filename_list("loras")
+  context = execution_context.ExecutionContext(request)
+  data = folder_paths.get_filename_list(context, "loras")
   return web.json_response(list(data))
 
 
@@ -120,11 +122,12 @@ async def delete_lora_info(request):
   del_info = not is_param_falsy(request, 'del_info')
   del_metadata = not is_param_falsy(request, 'del_metadata')
   del_civitai = not is_param_falsy(request, 'del_civitai')
+  context = execution_context.ExecutionContext(request)
   if lora_file is None:
     api_response['status'] = '404'
     api_response['error'] = 'No Lora file provided'
   elif lora_file == "ALL":  # Force the user to supply file=ALL to trigger all clearing.
-    lora_files = folder_paths.get_filename_list("loras")
+    lora_files = folder_paths.get_filename_list(context, "loras")
     for lora_file in lora_files:
       await delete_model_info(lora_file, del_info=del_info, del_metadata=del_metadata, del_civitai=del_civitai)
   else:
@@ -146,8 +149,10 @@ async def get_loras_info_response(request, maybe_fetch_civitai=False, maybe_fetc
   api_response = {'status': 200}
   lora_file = get_param(request, 'file')
   light = not is_param_falsy(request, 'light')
+  context = execution_context.ExecutionContext(request)
   if lora_file is not None:
-    info_data = await get_model_info(lora_file,
+    info_data = await get_model_info(context,
+                                     lora_file,
                                      maybe_fetch_civitai=maybe_fetch_civitai,
                                      maybe_fetch_metadata=maybe_fetch_metadata,
                                      light=light)
@@ -158,9 +163,10 @@ async def get_loras_info_response(request, maybe_fetch_civitai=False, maybe_fetc
       api_response['data'] = info_data
   else:
     api_response['data'] = []
-    lora_files = folder_paths.get_filename_list("loras")
+    lora_files = folder_paths.get_filename_list(context, "loras")
     for lora_file in lora_files:
-      info_data = await get_model_info(lora_file,
+      info_data = await get_model_info(context,
+                                       lora_file,
                                        maybe_fetch_civitai=maybe_fetch_civitai,
                                        maybe_fetch_metadata=maybe_fetch_metadata,
                                        light=light)
@@ -179,7 +185,8 @@ async def api_save_lora_data(request):
   else:
     post = await request.post()
     await set_model_info_partial(lora_file, json.loads(post.get("json")))
-    info_data = await get_model_info(lora_file)
+    context = execution_context.ExecutionContext(request)
+    info_data = await get_model_info(context, lora_file)
     api_response['data'] = info_data
   return web.json_response(api_response)
 
@@ -188,7 +195,8 @@ async def api_save_lora_data(request):
 async def api_get_loras_info_img(request):
   """ Returns an image response if one exists for the lora. """
   lora_file = get_param(request, 'file')
-  lora_path = folder_paths.get_full_path("loras", lora_file)
+  context = execution_context.ExecutionContext(request)
+  lora_path = folder_paths.get_full_path(context, "loras", lora_file)
   if not path_exists(lora_path):
     lora_path = os.path.abspath(lora_path)
 

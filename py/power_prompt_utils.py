@@ -1,15 +1,17 @@
 """Utilities for Power Prompt nodes."""
 import re
 import os
+
+import execution_context
 import folder_paths
 
 from .log import log_node_warn, log_node_info
 
 
-def get_and_strip_loras(prompt, silent=False, log_node="Power Prompt"):
+def get_and_strip_loras(context: execution_context.ExecutionContext, prompt, silent=False, log_node="Power Prompt"):
   """Collects and strips lora tags from a prompt."""
   pattern = '<lora:([^:>]*?)(?::(-?\d*(?:\.\d*)?))?>'
-  lora_paths = folder_paths.get_filename_list('loras')
+  lora_paths = folder_paths.get_filename_list(context, 'loras')
 
   matches = re.findall(pattern, prompt)
 
@@ -26,7 +28,7 @@ def get_and_strip_loras(prompt, silent=False, log_node="Power Prompt"):
       skipped_loras.append({'lora': tag_path, 'strength': strength})
       continue
 
-    lora_path = get_lora_by_filename(tag_path, lora_paths, log_node=None if silent else log_node)
+    lora_path = get_lora_by_filename(context, tag_path, lora_paths, log_node=None if silent else log_node)
     if lora_path is None:
       unfound_loras.append({'lora': tag_path, 'strength': strength})
       continue
@@ -37,9 +39,9 @@ def get_and_strip_loras(prompt, silent=False, log_node="Power Prompt"):
 
 
 # pylint: disable = too-many-return-statements, too-many-branches
-def get_lora_by_filename(file_path, lora_paths=None, log_node=None):
+def get_lora_by_filename(context: execution_context.ExecutionContext, file_path, lora_paths=None, log_node=None):
   """Returns a lora by filename, looking for exactl paths and then fuzzier matching."""
-  lora_paths = lora_paths if lora_paths is not None else folder_paths.get_filename_list('loras')
+  lora_paths = lora_paths if lora_paths is not None else folder_paths.get_filename_list(context, 'loras')
 
   if file_path in lora_paths:
     return file_path
