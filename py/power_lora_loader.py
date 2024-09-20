@@ -1,4 +1,6 @@
 import asyncio
+
+import execution_context
 import folder_paths
 
 from typing import Union
@@ -29,7 +31,7 @@ class RgthreePowerLoraLoader:
         "model": ("MODEL",),
         "clip": ("CLIP",),
       }),
-      "hidden": {},
+      "hidden": {"context": "EXECUTION_CONTEXT"},
     }
 
   RETURN_TYPES = ("MODEL", "CLIP")
@@ -38,6 +40,7 @@ class RgthreePowerLoraLoader:
 
   def load_loras(self, model=None, clip=None, **kwargs):
     """Loops over the provided loras in kwargs and applies valid ones."""
+    context = kwargs["context"]
     for key, value in kwargs.items():
       key = key.upper()
       if key.startswith('LORA_') and 'on' in value and 'lora' in value and 'strength' in value:
@@ -52,25 +55,26 @@ class RgthreePowerLoraLoader:
         else:
           strength_clip = strength_clip if strength_clip is not None else strength_model
         if value['on'] and (strength_model != 0 or strength_clip != 0):
-          lora = get_lora_by_filename(value['lora'], log_node=self.NAME)
+          lora = get_lora_by_filename(context, value['lora'], log_node=self.NAME)
           if model is not None and lora is not None:
-            model, clip = LoraLoader().load_lora(model, clip, lora, strength_model, strength_clip)
+            model, clip = LoraLoader().load_lora(model, clip, lora, strength_model, strength_clip, context=context)
 
     return (model, clip)
 
   @classmethod
   def get_enabled_loras_from_prompt_node(cls,
-                                         prompt_node: dict) -> list[dict[str, Union[str, float]]]:
+                                         prompt_node: dict,
+                                         context: execution_context.ExecutionContext) -> list[dict[str, Union[str, float]]]:
     """Gets enabled loras of a node within a server prompt."""
     result = []
     for name, lora in prompt_node['inputs'].items():
       if name.startswith('lora_') and lora['on']:
-        lora_file = get_lora_by_filename(lora['lora'], log_node=cls.NAME)
+        lora_file = get_lora_by_filename(context, lora['lora'], log_node=cls.NAME)
         if lora_file is not None:  # Add the same safety check
           lora_dict = {
             'name': lora['lora'],
             'strength': lora['strength'],
-            'path': folder_paths.get_full_path("loras", lora_file)
+            'path': folder_paths.get_full_path(context, "loras", lora_file)
           }
           if 'strengthTwo' in lora:
             lora_dict['strength_clip'] = lora['strengthTwo']
@@ -78,12 +82,12 @@ class RgthreePowerLoraLoader:
     return result
 
   @classmethod
-  def get_enabled_triggers_from_prompt_node(cls, prompt_node: dict, max_each: int = 1):
+  def get_enabled_triggers_from_prompt_node(cls, context: execution_context.ExecutionContext, prompt_node: dict, max_each: int = 1):
     """Gets trigger words up to the max for enabled loras of a node within a server prompt."""
-    loras = [l['name'] for l in cls.get_enabled_loras_from_prompt_node(prompt_node)]
+    loras = [l['name'] for l in cls.get_enabled_loras_from_prompt_node(prompt_node, context=context)]
     trained_words = []
     for lora in loras:
-      info = asyncio.run(get_model_info(lora, 'loras'))
+      info = asyncio.run(get_model_info(context, lora, 'loras'))
       if not info or not info.keys():
         log_node_warn(
           NODE_NAME,

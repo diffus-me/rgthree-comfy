@@ -9,6 +9,8 @@ import requests
 from server import PromptServer
 import folder_paths
 
+import execution_context
+
 from ..utils import get_dict_value, load_json_file, file_exists, remove_path, save_json_file
 from ..utils_userdata import read_userdata_json, save_userdata_json, delete_userdata_file
 
@@ -18,10 +20,10 @@ def _get_info_cache_file(data_type: str, file_hash: str):
 
 
 async def delete_model_info(
-  file: str, model_type, del_info=True, del_metadata=True, del_civitai=True
+  exec_context: execution_context.ExecutionContext, file: str, model_type, del_info=True, del_metadata=True, del_civitai=True
 ):
   """Delete the info json, and the civitai & metadata caches."""
-  file_path = get_folder_path(file, model_type)
+  file_path = get_folder_path(exec_context, file, model_type)
   if file_path is None:
     return
   if del_info:
@@ -36,9 +38,9 @@ async def delete_model_info(
       delete_userdata_file(json_file_path)
 
 
-def get_file_info(file: str, model_type):
+def get_file_info(exec_context: execution_context.ExecutionContext, file: str, model_type):
   """Gets basic file info, like created or modified date."""
-  file_path = get_folder_path(file, model_type)
+  file_path = get_folder_path(exec_context, file, model_type)
   if file_path is None:
     return None
   return {
@@ -63,7 +65,7 @@ def get_img_file(file_path: str, force=False):
       return try_path
 
 
-async def get_model_info(
+async def get_model_info(context: execution_context.ExecutionContext,
   file: str,
   model_type,
   default=None,
@@ -75,13 +77,13 @@ async def get_model_info(
 ):
   """Compiles a model info given a stored file next to the model, and/or metadata/civitai."""
 
-  file_path = get_folder_path(file, model_type)
+  file_path = get_folder_path(context, file, model_type)
   if file_path is None:
     return default
 
   should_save = False
   # basic data
-  basic_data = get_file_info(file, model_type)
+  basic_data = get_file_info(context, file, model_type)
   # Try to load a rgthree-info.json file next to the file.
   info_data = load_json_file(get_info_file(file_path), default={})
 
@@ -124,11 +126,11 @@ async def get_model_info(
   )
 
   if should_fetch_metadata:
-    data_meta = _get_model_metadata(file, model_type, default={}, refresh=force_fetch_metadata)
+    data_meta = _get_model_metadata(context, file, model_type, default={}, refresh=force_fetch_metadata)
     should_save = _merge_metadata(info_data, data_meta) or should_save
 
   if should_fetch_civitai:
-    data_civitai = _get_model_civitai_data(
+    data_civitai = _get_model_civitai_data(context,
       file, model_type, default={}, refresh=force_fetch_civitai
     )
     should_save = _merge_civitai_data(info_data, data_civitai) or should_save
@@ -316,9 +318,9 @@ def _merge_civitai_data(info_data: dict, data_civitai: dict) -> bool:
   return should_save
 
 
-def _get_model_civitai_data(file: str, model_type, default=None, refresh=False):
+def _get_model_civitai_data(context: execution_context.ExecutionContext, file: str, model_type, default=None, refresh=False):
   """Gets the civitai data, either cached from the user directory, or from civitai api."""
-  file_hash = _get_sha256_hash(get_folder_path(file, model_type))
+  file_hash = _get_sha256_hash(get_folder_path(context, file, model_type))
   if file_hash is None:
     return None
 
@@ -347,9 +349,9 @@ def _get_model_civitai_data(file: str, model_type, default=None, refresh=False):
   return response if response is not None else default
 
 
-def _get_model_metadata(file: str, model_type, default=None, refresh=False):
+def _get_model_metadata(context: execution_context.ExecutionContext, file: str, model_type, default=None, refresh=False):
   """Gets the metadata from the file itself."""
-  file_path = get_folder_path(file, model_type)
+  file_path = get_folder_path(context, file, model_type)
   file_hash = _get_sha256_hash(file_path)
   if file_hash is None:
     return default
@@ -403,9 +405,9 @@ def _read_file_metadata_from_header(file_path: str) -> dict:
   return data
 
 
-def get_folder_path(file: str, model_type):
+def get_folder_path(context: execution_context.ExecutionContext, file: str, model_type):
   """Gets the file path ensuring it exists."""
-  file_path = folder_paths.get_full_path(model_type, file)
+  file_path = folder_paths.get_full_path(context, model_type, file)
   if file_path and not file_exists(file_path):
     file_path = os.path.abspath(file_path)
   if not file_exists(file_path):
@@ -428,17 +430,18 @@ def _get_sha256_hash(file_path: str):
   return file_hash
 
 
-async def set_model_info_partial(file: str, model_type: str, info_data_partial):
+async def set_model_info_partial(context: execution_context.ExecutionContext, file: str, model_type: str, info_data_partial):
   """Sets partial data into the existing model info data."""
-  info_data = await get_model_info(file, model_type, default={})
+  info_data = await get_model_info(context, file, model_type, default={})
   info_data = {**info_data, **info_data_partial}
   save_model_info(file, info_data, model_type)
 
 
 def save_model_info(file: str, info_data, model_type):
   """Saves the model info alongside the model itself."""
-  file_path = get_folder_path(file, model_type)
-  if file_path is None:
-    return
-  info_path = get_info_file(file_path, force=True)
-  save_json_file(info_path, info_data)
+  # file_path = get_folder_path(file, model_type)
+  # if file_path is None:
+  #   return
+  # info_path = get_info_file(file_path, force=True)
+  # save_json_file(info_path, info_data)
+  pass

@@ -1,12 +1,13 @@
 import os
 import json
+import re
+
+import execution_context
+import folder_paths
 
 from .utils import get_dict_value, set_dict_value, dict_has_key, load_json_file
 from .pyproject import VERSION
 
-
-def get_config_value(key):
-  return get_dict_value(RGTHREE_CONFIG, key)
 
 
 def extend_config(default_config, user_config):
@@ -22,90 +23,97 @@ def extend_config(default_config, user_config):
   return cfg
 
 
-def set_user_config(data: dict):
+def set_rgthree_user_config(user_hash: str, data: dict):
   """ Sets the user configuration."""
   count = 0
+  user_config = get_rgthree_user_config(user_hash)
   for key, value in data.items():
-    if dict_has_key(DEFAULT_CONFIG, key):
-      set_dict_value(USER_CONFIG, key, value)
-      set_dict_value(RGTHREE_CONFIG, key, value)
-      count += 1
+    set_dict_value(user_config, key, value)
+    count += 1
   if count > 0:
-    write_user_config()
+    write_user_config(user_hash, user_config)
+
+
+def get_rgthree_user_config_file(user_hash):
+  user_dir = folder_paths.get_user_directory(user_hash)
+  return os.path.join(user_dir, 'rgthree_config.json')
 
 
 def get_rgthree_default_config():
   """ Gets the default configuration."""
-  return load_json_file(DEFAULT_CONFIG_FILE, default={})
+  global DEFAULT_CONFIG
+  if DEFAULT_CONFIG is None:
+    DEFAULT_CONFIG = load_json_file(DEFAULT_CONFIG_FILE, default={})
+  return DEFAULT_CONFIG
 
 
-def get_rgthree_user_config():
+def get_rgthree_user_config(user_hash: str = "default"):
   """ Gets the user configuration."""
-  return load_json_file(USER_CONFIG_FILE, default={})
+  user_config = load_json_file(get_rgthree_user_config_file(user_hash), default={})
+  return user_config
 
 
-def write_user_config():
+def write_user_config(user_hash: str, user_config: dict):
   """ Writes the user configuration."""
-  with open(USER_CONFIG_FILE, 'w+', encoding='UTF-8') as file:
-    json.dump(USER_CONFIG, file, sort_keys=True, indent=2, separators=(",", ": "))
+  with open(get_rgthree_user_config_file(user_hash), 'w+', encoding='UTF-8') as output_file:
+    json.dump(user_config, output_file, sort_keys=True, indent=2, separators=(",", ": "))
 
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG_FILE = os.path.join(THIS_DIR, '..', 'rgthree_config.json.default')
 USER_CONFIG_FILE = os.path.join(THIS_DIR, '..', 'rgthree_config.json')
 
-DEFAULT_CONFIG = {}
-USER_CONFIG = {}
-RGTHREE_CONFIG = {}
+DEFAULT_CONFIG = None
+# USER_CONFIG = {}
+# RGTHREE_CONFIG = {}
 
 
-def refresh_config():
+def refresh_config(context: execution_context.ExecutionContext):
   """Refreshes the config."""
-  global DEFAULT_CONFIG, USER_CONFIG, RGTHREE_CONFIG
-  DEFAULT_CONFIG = get_rgthree_default_config()
-  USER_CONFIG = get_rgthree_user_config()
+  user_config = get_rgthree_user_config(user_hash=context.user_hash)
 
   # Migrate old config options into "features"
   needs_to_write_user_config = False
-  if 'patch_recursive_execution' in USER_CONFIG:
-    del USER_CONFIG['patch_recursive_execution']
+  if 'patch_recursive_execution' in user_config:
+    del user_config['patch_recursive_execution']
     needs_to_write_user_config = True
 
-  if 'features' in USER_CONFIG and 'patch_recursive_execution' in USER_CONFIG['features']:
-    del USER_CONFIG['features']['patch_recursive_execution']
+  if 'features' in user_config and 'patch_recursive_execution' in user_config['features']:
+    del user_config['features']['patch_recursive_execution']
     needs_to_write_user_config = True
 
-  if 'show_alerts_for_corrupt_workflows' in USER_CONFIG:
-    if 'features' not in USER_CONFIG:
-      USER_CONFIG['features'] = {}
-    USER_CONFIG['features']['show_alerts_for_corrupt_workflows'] = USER_CONFIG[
+  if 'show_alerts_for_corrupt_workflows' in user_config:
+    if 'features' not in user_config:
+      user_config['features'] = {}
+    user_config['features']['show_alerts_for_corrupt_workflows'] = user_config[
       'show_alerts_for_corrupt_workflows']
-    del USER_CONFIG['show_alerts_for_corrupt_workflows']
+    del user_config['show_alerts_for_corrupt_workflows']
     needs_to_write_user_config = True
 
-  if 'monitor_for_corrupt_links' in USER_CONFIG:
-    if 'features' not in USER_CONFIG:
-      USER_CONFIG['features'] = {}
-    USER_CONFIG['features']['monitor_for_corrupt_links'] = USER_CONFIG['monitor_for_corrupt_links']
-    del USER_CONFIG['monitor_for_corrupt_links']
+  if 'monitor_for_corrupt_links' in user_config:
+    if 'features' not in user_config:
+      user_config['features'] = {}
+    user_config['features']['monitor_for_corrupt_links'] = user_config['monitor_for_corrupt_links']
+    del user_config['monitor_for_corrupt_links']
     needs_to_write_user_config = True
 
   if needs_to_write_user_config is True:
     print('writing new user config.')
-    write_user_config()
+    write_user_config(user_hash=context.user_hash, user_config=user_config)
 
-  RGTHREE_CONFIG = {"version": VERSION} | extend_config(DEFAULT_CONFIG, USER_CONFIG)
+  # RGTHREE_CONFIG = {"version": VERSION} | extend_config(DEFAULT_CONFIG, user_config)
+  #
+  # if "unreleased" in user_config and "unreleased" not in RGTHREE_CONFIG:
+  #   RGTHREE_CONFIG["unreleased"] = user_config["unreleased"]
+  #
+  # if "debug" in user_config and "debug" not in RGTHREE_CONFIG:
+  #   RGTHREE_CONFIG["debug"] = user_config["debug"]
 
-  if "unreleased" in USER_CONFIG and "unreleased" not in RGTHREE_CONFIG:
-    RGTHREE_CONFIG["unreleased"] = USER_CONFIG["unreleased"]
-
-  if "debug" in USER_CONFIG and "debug" not in RGTHREE_CONFIG:
-    RGTHREE_CONFIG["debug"] = USER_CONFIG["debug"]
-
-
-def get_config():
+def get_config(context: execution_context.ExecutionContext):
   """Returns the congfig."""
-  return RGTHREE_CONFIG
+  default_config = get_rgthree_default_config()
+  user_config = get_rgthree_user_config(user_hash=context.user_hash)
+  return {"version": VERSION} | extend_config(default_config, user_config)
 
 
-refresh_config()
+# refresh_config()

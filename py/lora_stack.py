@@ -1,3 +1,4 @@
+import execution_context
 from .constants import get_category, get_name
 from nodes import LoraLoader
 import folder_paths
@@ -9,38 +10,41 @@ class RgthreeLoraLoaderStack:
     CATEGORY = get_category()
 
     @classmethod
-    def INPUT_TYPES(cls):  # pylint: disable = invalid-name, missing-function-docstring
+    def INPUT_TYPES(cls, context: execution_context.ExecutionContext):  # pylint: disable = invalid-name, missing-function-docstring
         return {
             "required": {
                 "model": ("MODEL",),
                 "clip": ("CLIP", ),
 
-                "lora_01": (['None'] + folder_paths.get_filename_list("loras"), ),
+                "lora_01": (['None'] + folder_paths.get_filename_list(context,  "loras"), ),
                 "strength_01":("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.01}),
 
-                "lora_02": (['None'] + folder_paths.get_filename_list("loras"), ),
+                "lora_02": (['None'] + folder_paths.get_filename_list(context, "loras"), ),
                 "strength_02":("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.01}),
 
-                "lora_03": (['None'] + folder_paths.get_filename_list("loras"), ),
+                "lora_03": (['None'] + folder_paths.get_filename_list(context, "loras"), ),
                 "strength_03":("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.01}),
 
-                "lora_04": (['None'] + folder_paths.get_filename_list("loras"), ),
+                "lora_04": (['None'] + folder_paths.get_filename_list(context, "loras"), ),
                 "strength_04":("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.01}),
+            },
+            "hidden": {
+                "context": "EXECUTION_CONTEXT"
             }
         }
 
     RETURN_TYPES = ("MODEL", "CLIP")
     FUNCTION = "load_lora"
 
-    def load_lora(self, model, clip, lora_01, strength_01, lora_02, strength_02, lora_03, strength_03, lora_04, strength_04):
+    def load_lora(self, model, clip, lora_01, strength_01, lora_02, strength_02, lora_03, strength_03, lora_04, strength_04, context: execution_context.ExecutionContext=None):
         if lora_01 != "None" and strength_01 != 0:
-            model, clip = LoraLoader().load_lora(model, clip, lora_01, strength_01, strength_01)
+            model, clip = LoraLoader().load_lora(model, clip, lora_01, strength_01, strength_01, context=context)
         if lora_02 != "None" and strength_02 != 0:
-            model, clip = LoraLoader().load_lora(model, clip, lora_02, strength_02, strength_02)
+            model, clip = LoraLoader().load_lora(model, clip, lora_02, strength_02, strength_02, context=context)
         if lora_03 != "None" and strength_03 != 0:
-            model, clip = LoraLoader().load_lora(model, clip, lora_03, strength_03, strength_03)
+            model, clip = LoraLoader().load_lora(model, clip, lora_03, strength_03, strength_03, context=context)
         if lora_04 != "None" and strength_04 != 0:
-            model, clip = LoraLoader().load_lora(model, clip, lora_04, strength_04, strength_04)
+            model, clip = LoraLoader().load_lora(model, clip, lora_04, strength_04, strength_04, context=context)
 
         return (model, clip)
 

@@ -2,6 +2,7 @@ import os
 import json
 from aiohttp import web
 
+import execution_context
 from server import PromptServer
 import folder_paths
 
@@ -30,15 +31,17 @@ async def api_get_models_list(request):
   if _check_valid_model_type(request):
     return _check_valid_model_type(request)
 
-  model_type = request.match_info['type']
-  files = folder_paths.get_filename_list(model_type)
-  format_param = get_param(request, 'format')
-  if format_param == 'details':
-    response = []
-    for file in files:
-      response.append(get_file_info(file, model_type))
-    return web.json_response(response)
+  # exec_context = execution_context.ExecutionContext(request)
+  # model_type = request.match_info['type']
+  # files = folder_paths.get_filename_list(exec_context, model_type)
+  # format_param = get_param(request, 'format')
+  # if format_param == 'details':
+  #   response = []
+  #   for file in files:
+  #     response.append(get_file_info(file, model_type))
+  #   return web.json_response(response)
 
+  files = []
   return web.json_response(list(files))
 
 
@@ -82,48 +85,51 @@ async def api_get_delete_model_info(request):
     return _check_valid_model_type(request)
 
   api_response = {'status': 200}
-  model_type = request.match_info['type']
-  files_param = get_param(request, 'files')
-  if files_param is not None:
-    files_param = files_param.split(',')
-  del_info = not is_param_falsy(request, 'del_info')
-  del_metadata = not is_param_falsy(request, 'del_metadata')
-  del_civitai = not is_param_falsy(request, 'del_civitai')
-  if not files_param:
-    api_response['status'] = '404'
-    api_response['error'] = f'No file provided. Please pass files=ALL to clear {model_type} info.'
-  else:
-    if len(files_param) == 1 and files_param[
-      0] == "ALL":  # Force the user to supply files=ALL to trigger all clearing.
-      files_param = folder_paths.get_filename_list(model_type)
-    for file_param in files_param:
-      await delete_model_info(
-        file_param,
-        model_type,
-        del_info=del_info,
-        del_metadata=del_metadata,
-        del_civitai=del_civitai
-      )
+  # model_type = request.match_info['type']
+  # files_param = get_param(request, 'files')
+  # if files_param is not None:
+  #   files_param = files_param.split(',')
+  # del_info = not is_param_falsy(request, 'del_info')
+  # del_metadata = not is_param_falsy(request, 'del_metadata')
+  # del_civitai = not is_param_falsy(request, 'del_civitai')
+  # if not files_param:
+  #   api_response['status'] = '404'
+  #   api_response['error'] = f'No file provided. Please pass files=ALL to clear {model_type} info.'
+  # else:
+  #   exec_context = execution_context.ExecutionContext(request)
+  #   if len(files_param) == 1 and files_param[
+  #     0] == "ALL":  # Force the user to supply files=ALL to trigger all clearing.
+  #     files_param = folder_paths.get_filename_list(exec_context, model_type)
+  #   for file_param in files_param:
+  #     await delete_model_info(
+  #       exec_context,
+  #       file_param,
+  #       model_type,
+  #       del_info=del_info,
+  #       del_metadata=del_metadata,
+  #       del_civitai=del_civitai
+  #     )
   return web.json_response(api_response)
 
 
 @routes.post('/rgthree/api/{type}/info')
 async def api_post_save_model_data(request):
   """Saves data to a model by name. """
+  # exec_context = execution_context.ExecutionContext(request)
   if _check_valid_model_type(request):
     return _check_valid_model_type(request)
 
-  model_type = request.match_info['type']
+  # model_type = request.match_info['type']
   api_response = {'status': 200}
-  file_param = get_param(request, 'file')
-  if file_param is None:
-    api_response['status'] = '404'
-    api_response['error'] = 'No model found at path'
-  else:
-    post = await request.post()
-    await set_model_info_partial(file_param, model_type, json.loads(post.get("json")))
-    info_data = await get_model_info(file_param, model_type)
-    api_response['data'] = info_data
+  # file_param = get_param(request, 'file')
+  # if file_param is None:
+  #   api_response['status'] = '404'
+  #   api_response['error'] = 'No model found at path'
+  # else:
+  #   post = await request.post()
+  #   await set_model_info_partial(exec_context, file_param, model_type, json.loads(post.get("json")))
+  #   info_data = await get_model_info(exec_context, file_param, model_type)
+  #   api_response['data'] = info_data
   return web.json_response(api_response)
 
 
@@ -132,10 +138,10 @@ async def api_get_models_info_img(request):
   """ Returns an image response if one exists for the model. """
   if _check_valid_model_type(request):
     return _check_valid_model_type(request)
-
+  exec_context = execution_context.ExecutionContext(request)
   model_type = request.match_info['type']
   file_param = get_param(request, 'file')
-  file_path = folder_paths.get_full_path(model_type, file_param)
+  file_path = folder_paths.get_full_path(exec_context, model_type, file_param)
   if not path_exists(file_path):
     file_path = os.path.abspath(file_path)
 
@@ -159,20 +165,22 @@ async def models_info_response(
   request, model_type, maybe_fetch_civitai=False, maybe_fetch_metadata=False
 ):
   """Gets model info for all or a single model type."""
+  # context = execution_context.ExecutionContext(request)
   api_response = {'status': 200, 'data': []}
-  light = not is_param_falsy(request, 'light')
-  files_param = get_param(request, 'files')
-  if files_param is not None:
-    files_param = files_param.split(',')
-  else:
-    files_param = folder_paths.get_filename_list(model_type)
-  for file_param in files_param:
-    info_data = await get_model_info(
-      file_param,
-      model_type,
-      maybe_fetch_civitai=maybe_fetch_civitai,
-      maybe_fetch_metadata=maybe_fetch_metadata,
-      light=light
-    )
-    api_response['data'].append(info_data)
+  # light = not is_param_falsy(request, 'light')
+  # files_param = get_param(request, 'files')
+  # if files_param is not None:
+  #   files_param = files_param.split(',')
+  # else:
+  #   files_param = folder_paths.get_filename_list(context, model_type)
+  # for file_param in files_param:
+  #   info_data = await get_model_info(
+  #     context,
+  #     file_param,
+  #     model_type,
+  #     maybe_fetch_civitai=maybe_fetch_civitai,
+  #     maybe_fetch_metadata=maybe_fetch_metadata,
+  #     light=light
+  #   )
+  #   api_response['data'].append(info_data)
   return api_response

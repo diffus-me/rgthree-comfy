@@ -1,6 +1,8 @@
 """A simpler SDXL Power Prompt that doesn't load Loras, like for negative."""
 import os
 import re
+
+import execution_context
 import folder_paths
 from nodes import MAX_RESOLUTION, LoraLoader
 from comfy_extras.nodes_clip_sdxl import CLIPTextEncodeSDXL
@@ -20,7 +22,7 @@ class RgthreeSDXLPowerPromptSimple(RgthreeSDXLPowerPromptPositive):
   CATEGORY = get_category()
 
   @classmethod
-  def INPUT_TYPES(cls):  # pylint: disable = invalid-name, missing-function-docstring
+  def INPUT_TYPES(cls, context: execution_context.ExecutionContext):  # pylint: disable = invalid-name, missing-function-docstring
     # Removed Saved Prompts feature; No sure it worked any longer. UI should fail gracefully,
     # TODO: Rip out saved prompt input data
     SAVED_PROMPTS_FILES=[]
@@ -52,7 +54,7 @@ class RgthreeSDXLPowerPromptSimple(RgthreeSDXLPowerPromptPositive):
         }),
         'insert_embedding': ([
           'CHOOSE',
-        ] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list('embeddings')],),
+        ] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list(context, 'embeddings')],),
         'insert_saved': ([
           'CHOOSE',
         ] + SAVED_PROMPTS_FILES,),

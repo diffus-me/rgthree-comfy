@@ -1,4 +1,6 @@
 import os
+
+import execution_context
 import folder_paths
 from nodes import CLIPTextEncode
 from .constants import get_category, get_name
@@ -10,7 +12,7 @@ class RgthreePowerPromptSimple(RgthreePowerPrompt):
     CATEGORY = get_category()
 
     @classmethod
-    def INPUT_TYPES(cls):  # pylint: disable = invalid-name, missing-function-docstring
+    def INPUT_TYPES(cls, context: execution_context.ExecutionContext):  # pylint: disable = invalid-name, missing-function-docstring
         # Removed Saved Prompts feature; No sure it worked any longer. UI should fail gracefully,
         # TODO: Rip out saved prompt input data
         SAVED_PROMPTS_FILES=[]
@@ -21,7 +23,7 @@ class RgthreePowerPromptSimple(RgthreePowerPrompt):
             },
             'optional': {
                 "opt_clip": ("CLIP", ),
-                'insert_embedding': (['CHOOSE',] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list('embeddings')],),
+                'insert_embedding': (['CHOOSE',] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list(context, 'embeddings')],),
                 'insert_saved': (['CHOOSE',] + SAVED_PROMPTS_FILES,),
             },
             'hidden': {

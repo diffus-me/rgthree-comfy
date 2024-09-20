@@ -15,7 +15,7 @@ import random
 import execution
 
 from .py.log import log
-from .py.config import get_config_value
+# from .py.config import get_config_value
 from .py.server.rgthree_server import *
 
 from .py.context import RgthreeContext
@@ -71,9 +71,9 @@ NODE_CLASS_MAPPINGS = {
   RgthreePowerPuter.NAME: RgthreePowerPuter,
 }
 
-if get_config_value('unreleased.dynamic_context.enabled') is True:
-  NODE_CLASS_MAPPINGS[RgthreeDynamicContext.NAME] = RgthreeDynamicContext
-  NODE_CLASS_MAPPINGS[RgthreeDynamicContextSwitch.NAME] = RgthreeDynamicContextSwitch
+# if get_config_value('unreleased.dynamic_context.enabled') is True:
+#   NODE_CLASS_MAPPINGS[RgthreeDynamicContext.NAME] = RgthreeDynamicContext
+#   NODE_CLASS_MAPPINGS[RgthreeDynamicContextSwitch.NAME] = RgthreeDynamicContextSwitch
 
 # WEB_DIRECTORY is the comfyui nodes directory that ComfyUI will link and auto-load.
 WEB_DIRECTORY = "./web/comfyui"

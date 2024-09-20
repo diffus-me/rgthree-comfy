@@ -150,7 +150,6 @@ class Rgthree extends EventTarget {
         this.setLogLevel(logLevel);
         this.initializeGraphAndCanvasHooks();
         this.initializeComfyUIHooks();
-        this.initializeContextMenu();
         this.rgthreeCssPromise = injectCss("extensions/rgthree-comfy/rgthree.css");
         this.initializeProgressBar();
         CONFIG_SERVICE.addEventListener("config-change", ((e) => {

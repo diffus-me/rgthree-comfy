@@ -1,5 +1,7 @@
 import os
 import re
+
+import execution_context
 from nodes import MAX_RESOLUTION
 from comfy_extras.nodes_clip_sdxl import CLIPTextEncodeSDXL
 
@@ -19,7 +21,7 @@ class RgthreeSDXLPowerPromptPositive:
   CATEGORY = get_category()
 
   @classmethod
-  def INPUT_TYPES(cls):  # pylint: disable = invalid-name, missing-function-docstring
+  def INPUT_TYPES(cls, context: execution_context.ExecutionContext):  # pylint: disable = invalid-name, missing-function-docstring
     # Removed Saved Prompts feature; No sure it worked any longer. UI should fail gracefully,
     # TODO: Rip out saved prompt input data
     SAVED_PROMPTS_FILES=[]
@@ -51,10 +53,10 @@ class RgthreeSDXLPowerPromptPositive:
           "max": MAX_RESOLUTION
         }),
         'insert_lora': (['CHOOSE', 'DISABLE LORAS'] +
-                        [os.path.splitext(x)[0] for x in folder_paths.get_filename_list('loras')],),
+                        [os.path.splitext(x)[0] for x in folder_paths.get_filename_list(context, 'loras')],),
         'insert_embedding': ([
           'CHOOSE',
-        ] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list('embeddings')],),
+        ] + [os.path.splitext(x)[0] for x in folder_paths.get_filename_list(context, 'embeddings')],),
         'insert_saved': ([
           'CHOOSE',
         ] + SAVED_PROMPTS_FILES,),
@@ -82,6 +84,7 @@ class RgthreeSDXLPowerPromptPositive:
       },
       'hidden': {
         'values_insert_saved': (['CHOOSE'] + SAVED_PROMPTS_CONTENT,),
+        "context": "EXECUTION_CONTEXT",
       }
     }
 
@@ -103,13 +106,16 @@ class RgthreeSDXLPowerPromptPositive:
            target_height=-1,
            crop_width=-1,
            crop_height=-1,
-           values_insert_saved=None):
+           values_insert_saved=None,
+           context: execution_context.ExecutionContext=None):
 
     if insert_lora == 'DISABLE LORAS':
-      prompt_g, loras_g, _skipped, _unfound = get_and_strip_loras(prompt_g,
+      prompt_g, loras_g, _skipped, _unfound = get_and_strip_loras(context,
+                                                                  prompt_g,
                                                                   True,
                                                                   log_node=self.NAME)
-      prompt_l, loras_l, _skipped, _unfound = get_and_strip_loras(prompt_l,
+      prompt_l, loras_l, _skipped, _unfound = get_and_strip_loras(context,
+                                                                  prompt_l,
                                                                   True,
                                                                   log_node=self.NAME)
       loras = loras_g + loras_l
@@ -117,20 +123,23 @@ class RgthreeSDXLPowerPromptPositive:
         NODE_NAME,
         f'Disabling all found loras ({len(loras)}) and stripping lora tags for TEXT output.')
     elif opt_model is not None and opt_clip is not None:
-      prompt_g, loras_g, _skipped, _unfound = get_and_strip_loras(prompt_g, log_node=self.NAME)
-      prompt_l, loras_l, _skipped, _unfound = get_and_strip_loras(prompt_l, log_node=self.NAME)
+      prompt_g, loras_g, _skipped, _unfound = get_and_strip_loras(context, prompt_g, log_node=self.NAME)
+      prompt_l, loras_l, _skipped, _unfound = get_and_strip_loras(context, prompt_l, log_node=self.NAME)
       loras = loras_g + loras_l
       if len(loras) > 0:
         for lora in loras:
           opt_model, opt_clip = LoraLoader().load_lora(opt_model, opt_clip, lora['lora'],
-                                                       lora['strength'], lora['strength'])
+                                                       lora['strength'], lora['strength'],
+                                                       context=context)
           log_node_success(NODE_NAME, f'Loaded "{lora["lora"]}" from prompt')
         log_node_info(NODE_NAME, f'{len(loras)} Loras processed; stripping tags for TEXT output.')
     elif '<lora:' in prompt_g or '<lora:' in prompt_l:
-      _prompt_g, loras_g, _skipped, _unfound = get_and_strip_loras(prompt_g,
+      _prompt_g, loras_g, _skipped, _unfound = get_and_strip_loras(context,
+                                                                   prompt_g,
                                                                    True,
                                                                    log_node=self.NAME)
-      _prompt_l, loras_l, _skipped, _unfound = get_and_strip_loras(prompt_l,
+      _prompt_l, loras_l, _skipped, _unfound = get_and_strip_loras(context,
+                                                                   prompt_l,
                                                                    True,
                                                                    log_node=self.NAME)
       loras = loras_g + loras_l
